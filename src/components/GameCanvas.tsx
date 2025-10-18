@@ -168,6 +168,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameFinish }) => {
           jumpStartTime = Date.now();
         }
       }
+      if (event.code === 'KeyA' || event.code === 'ArrowLeft' || event.code === 'KeyD' || event.code === 'ArrowRight') {
+        event.preventDefault();
+      }
     };
 
     const handleKeyUp = (event: KeyboardEvent) => {
