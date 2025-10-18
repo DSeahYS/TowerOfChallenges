@@ -1,0 +1,15 @@
+mutations:
+  - name: createTowerScore
+    type: TowerScore
+    inputs:
+      towerId: String!
+      score: Float!
+      username: String!
+    operation: create
+queries:
+  - name: listTowerScores
+    type: [TowerScore!]
+    inputs:
+      towerId: String!
+    operation: list
+    orderBy: score asc

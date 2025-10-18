@@ -1,0 +1,64 @@
+# Kiro Configuration for Tower of Challenges
+# Defines all major components: Devvit Web app, Devvit Bolt app, Firebase Data Connect, and Firestore
+
+components:
+  # Devvit Web App - Main game interface
+  devvit-web-app:
+    type: devvit-app
+    name: tower-challenges-web
+    version: "1.0.0"
+    description: "Tower of Challenges game frontend"
+    source: "./src"
+    build:
+      command: "npm run build"
+      output: "./dist"
+    deploy:
+      platform: devvit
+      environment: production
+    dependencies:
+      - react: "^18.2.0"
+      - three: "^0.178.0"
+      - matter-js: "file:../Support Code/matter-js"
+    config:
+      redditAPI: true
+      redis: true
+
+  # Devvit Bolt App - Reddit integration and scoring
+  devvit-bolt-app:
+    type: devvit-app
+    name: tower-challenges-bolt
+    version: "1.0.0"
+    description: "Devvit app for Tower of Challenges Reddit integration"
+    source: "./backend/devvit"
+    build:
+      command: "npm run build"
+      output: "./dist"
+    deploy:
+      platform: devvit
+      environment: production
+    dependencies:
+      - "@devvit/public-api": "^0.11.0"
+    config:
+      redditAPI: true
+      redis: true
+    triggers:
+      - event: CommentSubmit
+        handler: handleCommentSubmit
+      - event: PostSubmit
+        handler: handlePostSubmit
+      - event: AppInstall
+        handler: handleAppInstall
+
+  # Firebase Firestore - Scores storage
+  firestore-database:
+    type: firebase-firestore
+    name: TowerScores
+    deploy:
+      region: us-central1
+
+  # Firebase Data Connect - API for scores
+  firebase-dataconnect:
+    type: firebase-dataconnect
+    source: "./dataconnect"
+    deploy:
+      region: us-central1

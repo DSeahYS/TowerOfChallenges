@@ -1,0 +1,6 @@
+type TowerScore @table {
+  towerId: String!
+  score: Float!
+  username: String!
+  timestamp: Timestamp!
+}

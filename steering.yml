@@ -1,0 +1,244 @@
+# Kiro Steering Configuration for Tower of Challenges
+# Defines the deploy-all command chaining deployment of Firebase backend and both Devvit apps
+
+commands:
+  # One-command deployment for production - "one command to run the world"
+  deploy-all:
+    description: "Deploy all components to production environment"
+    environment: production
+    parallel: false  # Sequential deployment to ensure dependencies
+    steps:
+      - name: validate-configuration
+        action: validate
+        config:
+          specs: specs.yml
+          hooks: hooks.yml
+
+      - name: deploy-infrastructure
+        action: deploy
+        components:
+          - firestore-database
+        wait: true  # Wait for infrastructure to be ready
+
+      - name: deploy-backend-services
+        action: deploy
+        components:
+          - firebase-dataconnect
+        wait: true
+
+      - name: deploy-firebase-hosting
+        action: deploy
+        components:
+          - firebase-hosting
+        depends_on:
+          - firebase-dataconnect
+        wait: true
+
+      - name: deploy-devvit-apps
+        action: deploy
+        components:
+          - devvit-web-app
+          - devvit-bolt-app
+        parallel: true  # Deploy Devvit apps in parallel
+        wait: true
+
+      - name: run-post-deployment-tests
+        action: test
+        hooks:
+          - post-score-test
+          - gif-share-test
+          - integration-test
+        environment: staging  # Test in staging first
+        on_failure: rollback
+
+      - name: promote-to-production
+        action: promote
+        from: staging
+        to: production
+        components:
+          - devvit-web-app
+          - devvit-bolt-app
+          - firebase-hosting
+
+      - name: verify-production-deployment
+        action: verify
+        checks:
+          - component: devvit-web-app
+            check: health
+            endpoint: "https://tower-challenges.devvit.dev"
+          - component: devvit-bolt-app
+            check: reddit-integration
+            subreddit: r/TowerOfChallenges
+          - component: firebase-hosting
+            check: endpoints
+            endpoints:
+              - /submit-score
+              - /get-scores
+              - /share-gif
+
+  # Development deployment - faster deployment for testing
+  deploy-dev:
+    description: "Deploy to development environment for testing"
+    environment: development
+    parallel: true  # Parallel deployment for faster dev cycles
+    steps:
+      - name: deploy-dev-infrastructure
+        action: deploy
+        components:
+          - firestore-database
+
+      - name: deploy-dev-backend
+        action: deploy
+        components:
+          - firebase-dataconnect
+          - firebase-hosting
+
+      - name: deploy-dev-apps
+        action: deploy
+        components:
+          - devvit-web-app
+          - devvit-bolt-app
+
+  # Staging deployment - pre-production testing
+  deploy-staging:
+    description: "Deploy to staging environment for pre-production testing"
+    environment: staging
+    parallel: false
+    steps:
+      - name: deploy-staging-infrastructure
+        action: deploy
+        components:
+          - firestore-database
+        wait: true
+
+      - name: deploy-staging-backend
+        action: deploy
+        components:
+          - firebase-dataconnect
+        wait: true
+
+      - name: deploy-staging-hosting
+        action: deploy
+        components:
+          - firebase-hosting
+        wait: true
+
+      - name: deploy-staging-apps
+        action: deploy
+        components:
+          - devvit-web-app
+          - devvit-bolt-app
+        wait: true
+
+      - name: run-staging-tests
+        action: test
+        hooks:
+          - post-score-test
+          - gif-share-test
+          - integration-test
+
+  # Rollback command - emergency rollback to previous version
+  rollback:
+    description: "Rollback all components to previous stable version"
+    environment: production
+    steps:
+      - name: rollback-devvit-apps
+        action: rollback
+        components:
+          - devvit-web-app
+          - devvit-bolt-app
+        to_version: previous
+
+      - name: rollback-backend
+        action: rollback
+        components:
+          - firebase-dataconnect
+          - firebase-hosting
+        to_version: previous
+
+      - name: verify-rollback
+        action: verify
+        checks:
+          - component: devvit-web-app
+            check: health
+          - component: firebase-hosting
+            check: endpoints
+
+  # Update command - rolling update for zero-downtime deployments
+  update:
+    description: "Perform rolling update of all components"
+    environment: production
+    steps:
+      - name: update-firebase-dataconnect
+        action: update
+        components:
+          - firebase-dataconnect
+        strategy: rolling
+        batch_size: 1
+
+      - name: update-firebase-hosting
+        action: update
+        components:
+          - firebase-hosting
+
+      - name: update-devvit-apps
+        action: update
+        components:
+          - devvit-web-app
+          - devvit-bolt-app
+        strategy: blue-green
+
+      - name: run-update-tests
+        action: test
+        hooks:
+          - integration-test
+
+  # Destroy command - clean up all resources (use with caution)
+  destroy:
+    description: "Destroy all deployed resources"
+    environment: all
+    confirm: true  # Require explicit confirmation
+    steps:
+      - name: destroy-devvit-apps
+        action: destroy
+        components:
+          - devvit-web-app
+          - devvit-bolt-app
+
+      - name: destroy-backend
+        action: destroy
+        components:
+          - firebase-dataconnect
+          - firebase-hosting
+
+      - name: destroy-infrastructure
+        action: destroy
+        components:
+          - firestore-database
+
+  # Health check command - verify all components are healthy
+  health-check:
+    description: "Run health checks on all deployed components"
+    environment: production
+    steps:
+      - name: check-devvit-apps
+        action: health-check
+        components:
+          - devvit-web-app
+          - devvit-bolt-app
+
+      - name: check-backend-services
+        action: health-check
+        components:
+          - firebase-dataconnect
+          - firebase-hosting
+
+      - name: check-infrastructure
+        action: health-check
+        components:
+          - firestore-database
+
+      - name: generate-health-report
+        action: report
+        format: json
+        output: health-report.json

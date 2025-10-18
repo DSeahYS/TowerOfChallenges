@@ -1,0 +1,186 @@
+# Kiro Hooks Configuration for Tower of Challenges
+# Defines test hooks that run on git push to verify functionality
+
+hooks:
+  # Post-score test hook - simulates comment submission and verifies leaderboard update
+  post-score-test:
+    trigger: git-push
+    description: "Test hook that simulates score submission via comment and verifies leaderboard update using Firebase Data Connect"
+    environment: test
+    steps:
+      - name: setup-test-environment
+        action: setup
+        config:
+          components:
+            - firestore-database
+            - firebase-dataconnect
+          mock-reddit: true
+
+      - name: simulate-comment-submission
+        action: simulate
+        config:
+          type: reddit-comment
+          subreddit: r/TowerOfChallenges
+          comment: "I just scored 1500 points on Tower Challenge #42! #TowerOfChallenges"
+          user: test-user-123
+          postId: test-post-456
+
+      - name: verify-score-parsing
+        action: verify
+        config:
+          component: devvit-bolt-app
+          check: score-parsed
+          expected:
+            towerId: "42"
+            score: 1500
+            playerId: "test-user-123"
+
+      - name: verify-dataconnect-mutation
+        action: verify
+        config:
+          component: firebase-dataconnect
+          check: mutation-executed
+          operation: createTowerScore
+          expected:
+            inputs:
+              towerId: "42"
+              score: 1500
+              username: "test-user-123"
+
+      - name: verify-firestore-storage
+        action: verify
+        config:
+          component: firestore-database
+          check: document-stored
+          expected:
+            collection: towerScores
+            document:
+              towerId: "42"
+              score: 1500
+              username: "test-user-123"
+
+      - name: verify-leaderboard-query
+        action: verify
+        config:
+          component: firebase-dataconnect
+          check: query-response
+          operation: listTowerScores
+          inputs:
+            towerId: "42"
+          expected:
+            contains:
+              - towerId: "42"
+                score: 1500
+                username: "test-user-123"
+
+      - name: cleanup-test-data
+        action: cleanup
+        config:
+          components:
+            - firestore-database
+          remove-test-documents: true
+
+  # GIF share test hook - tests GIF generation and sharing functionality
+  gif-share-test:
+    trigger: git-push
+    description: "Test hook that simulates GIF generation and sharing via Devvit"
+    environment: test
+    steps:
+      - name: setup-gif-test-environment
+        action: setup
+        config:
+          components:
+            - devvit-web-app
+            - devvit-bolt-app
+          mock-reddit: true
+
+      - name: simulate-gif-generation
+        action: simulate
+        config:
+          type: game-completion
+          towerId: "42"
+          score: 1500
+          gifData: "base64-encoded-gif"
+
+      - name: verify-gif-sharing
+        action: verify
+        config:
+          component: devvit-bolt-app
+          check: reddit-post-created
+          expected:
+            type: comment
+            contains: "#TowerOfChallenges GIF"
+
+      - name: cleanup-gif-test-data
+        action: cleanup
+        config:
+          components:
+            - mock-reddit
+          remove-test-posts: true
+
+  # Integration test hook - full end-to-end test
+  integration-test:
+    trigger: git-push
+    description: "Full integration test simulating complete user flow with Firebase services"
+    environment: test
+    steps:
+      - name: setup-integration-environment
+        action: setup
+        config:
+          components:
+            - devvit-web-app
+            - devvit-bolt-app
+            - firebase-dataconnect
+            - firestore-database
+            - firebase-hosting
+          mock-reddit: true
+          mock-browser: true
+
+      - name: simulate-game-play
+        action: simulate
+        config:
+          type: game-session
+          duration: 300  # 5 minutes
+          expected-score: 1500
+          tower-id: "42"
+
+      - name: simulate-score-submission
+        action: simulate
+        config:
+          type: dataconnect-mutation
+          operation: createTowerScore
+          inputs:
+            towerId: "42"
+            score: 1500
+            username: "integration-test-user"
+
+      - name: simulate-gif-share
+        action: simulate
+        config:
+          type: reddit-comment
+          subreddit: r/TowerOfChallenges
+          comment: "Completed Tower #42 in 01:23.456! [GIF](data:image/gif;base64,base64-encoded-gif-data)"
+          user: integration-test-user
+
+      - name: verify-complete-flow
+        action: verify
+        config:
+          checks:
+            - component: firestore-database
+              check: document-count
+              expected: 1
+            - component: firebase-dataconnect
+              check: query-result
+              operation: listTowerScores
+              inputs: { towerId: "42" }
+              expected: { count: 1 }
+            - component: devvit-bolt-app
+              check: reddit-comment-posted
+              expected: true
+
+      - name: cleanup-integration-test
+        action: cleanup
+        config:
+          components:
+            - firestore-database
+          remove-all-data: true
