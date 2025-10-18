@@ -3,12 +3,15 @@ import SplashScreen from './components/SplashScreen';
 import GameCanvas from './components/GameCanvas';
 import LeaderboardWidget from './components/LeaderboardWidget';
 import { leaderboardService } from './services/leaderboardService';
+import { analytics } from './firebase';
+import { logEvent } from "firebase/analytics";
 
 const App: React.FC = () => {
   const [gameStarted, setGameStarted] = useState(false);
   const [finalTime, setFinalTime] = useState<number | null>(null);
 
   const handlePlayNow = () => {
+    logEvent(analytics, 'game_start');
     setGameStarted(true);
   };
 
