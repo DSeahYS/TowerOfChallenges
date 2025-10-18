@@ -64,6 +64,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameFinish }) => {
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
+    // Focus the canvas to enable keyboard events
+    canvasRef.current.focus();
+
     // Lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambientLight);
@@ -183,8 +186,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameFinish }) => {
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
 
     // Game loop
     let animationId: number;
@@ -307,8 +310,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameFinish }) => {
     // Cleanup
     return () => {
       cancelAnimationFrame(animationId);
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('resize', handleResize);
       renderer.dispose();
       Matter.Engine.clear(engine);
@@ -317,7 +320,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameFinish }) => {
 
   return (
     <>
-      <canvas ref={canvasRef} style={{ display: 'block' }} />
+      <canvas ref={canvasRef} style={{ display: 'block' }} tabIndex={0} />
 
       {/* Countdown Overlay */}
       {gameState === 'countdown' && (
